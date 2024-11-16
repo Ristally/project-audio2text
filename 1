@@ -1,0 +1,51 @@
+import os
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+import speech_recognition as sr
+from pydub import AudioSegment
+
+def start(update: Update, _: CallbackContext):
+    update.message.reply_text('Пришлите мне аудиофайл и я расшифрую его для вас!')
+
+def audio_to_text(audio_file):
+    audio = AudioSegment.from_file(audio_file)
+    audio.export("temp.wav", format="wav")
+
+    recognizer = sr.Recognizer()
+    with sr.AudioFile("temp.wav") as source:
+        audio_data = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio_data, language="ru-RU")
+            return text
+        except sr.UnknownValueError:
+            return "Could not understand the audio"
+        except sr.RequestError as e:
+            return f"Recognition service error: {e}"
+
+def handle_audio(update: Update, _: CallbackContext):
+    file = update.message.audio or update.message.voice
+    file_path = file.get_file().download()
+    
+    # Convert file to text
+    text = audio_to_text(file_path)
+    
+    # Send the text back to user
+    update.message.reply_text(text)
+
+    # Remove the downloaded file and temp.wav
+    os.remove(file_path)
+    if os.path.exists("temp.wav"):
+        os.remove("temp.wav")
+
+def main():
+    updater = Updater("7656557943:AAF1KWoi4osBWuOjkk05rH4ktrh_J9k5rmk")
+
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.audio | Filters.voice, handle_audio))
+
+    updater.start_polling()
+    updater.idle()
+
+if name == 'main':
+    main()
